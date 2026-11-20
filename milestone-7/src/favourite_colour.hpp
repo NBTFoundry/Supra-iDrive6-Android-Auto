@@ -5,13 +5,18 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <stdio.h>
+#include <unistd.h>
+#include "nbt_paths.hpp"
 namespace nbt {
 enum FavouriteColourMode { kFavouriteBMW=0,kFavouriteAmbient,kFavouriteBronze,kFavouriteWhite,
     kFavouriteOrange,kFavouriteBlue,kFavouriteGreen,kFavouriteLilac,kFavouriteCustom,kFavouriteColourCount };
-static const char* const kFavouriteColourPath="/var/opt/aa/favourite-bar-colour";
-static const char* const kFavouriteDisabledPath="/var/opt/aa/favourite-bar.disabled";
-inline int loadFavouriteColour(const char* path=kFavouriteColourPath) {
- FILE* f=fopen(path,"r");if(!f)return kFavouriteBMW;
+// Settings files in the data dir (nbt_paths.hpp), written by the iDrive app's Settings page and the picker.
+static const char* const kFavouriteColourName="favourite-bar-colour";
+static const char* const kFavouriteDisabledName="favourite-bar.disabled";
+static const char* const kFavouriteCustomName="favourite-bar-custom";
+inline bool favouriteBarDisabled() { return access(dataFile(kFavouriteDisabledName).c_str(),F_OK)==0; }
+inline int loadFavouriteColour(const char* path=NULL) {
+ FILE* f=fopen(path?path:dataFile(kFavouriteColourName).c_str(),"r");if(!f)return kFavouriteBMW;
  int n=-1;char extra=0;int count=fscanf(f,"%d %c",&n,&extra);fclose(f);
  return count==1&&n>=0&&n<kFavouriteColourCount?n:kFavouriteBMW;
 }
@@ -42,7 +47,7 @@ inline uint32_t favouriteHueRGB(unsigned hue) {
 // specific to the physical LEDs. RGB zero preserves the native BMW gradient.
 inline uint32_t favouriteColourRGB(int mode,const AmbientColour& ambient) {
  if(mode==kFavouriteCustom){
-  FILE* f=fopen("/var/opt/aa/favourite-bar-custom","r");unsigned rgb=0x2080d0;char extra;
+  FILE* f=fopen(dataFile(kFavouriteCustomName).c_str(),"r");unsigned rgb=0x2080d0;char extra;
   if(f){unsigned n;if(fscanf(f,"%x %c",&n,&extra)==1&&n<=0xffffff)rgb=n;fclose(f);}
   return rgb?rgb:0x1000000u; // Zero is reserved for the untouched native gradient.
  }

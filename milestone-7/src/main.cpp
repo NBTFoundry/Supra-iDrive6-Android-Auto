@@ -81,6 +81,7 @@
 // **Use** means anything you do with the software requiring one of your licenses.
 
 #include "nbt_env.hpp"
+#include "favourite_colour.hpp"
 #include "audio/config.hpp"
 #include "car_config.hpp"
 #include "screen_video.h"
@@ -170,10 +171,9 @@ static volatile sig_atomic_t g_favouritePeek = 0;
 static volatile sig_atomic_t g_favouriteTouchMask = 0;
 static volatile sig_atomic_t g_favouriteInputSerial = 0;
 static volatile sig_atomic_t g_mainWake = 0;   // cuts the main loop's 250 ms sleep short
-// The Settings toggle (rhmiapp-87): the plugin writes /var/opt/aa/favourite-bar.disabled. Checked here, per
+// The Settings toggle (rhmiapp-87): the plugin writes favourite-bar.disabled in the data dir. Checked here, per
 // frame, so the switch works without restarting the daemon (the env only forces the capturer off).
-static const char* const kFavouriteOffFile = "/var/opt/aa/favourite-bar.disabled";
-static bool favouriteBarOff() { return access(kFavouriteOffFile, F_OK) == 0; }
+static bool favouriteBarOff() { return nbt::favouriteBarDisabled(); }
 namespace nbt { int favouriteOverlayRun(int argc, char** argv); void favouriteOverlayStop(); }
 
 // The favourite strip used to be a second process (nbt-aa-favourites, spawned through TileProcess). It is
@@ -536,25 +536,26 @@ static volatile int g_btLink = 0;              // wireless thread: phone's Bluet
 static const char* const kUiStateFile = "/dev/shmem/nbt-aad-state";
 static void writeStatus(const char* state);    // defined after the session globals it reads
 static std::string g_carplayIni;               // carplay.ini path car_config resolved, "" = none
-// Car manufacturer (rhmiapp-96): the Settings page writes /var/opt/aa/vehicle (auto|bmw|toyota|mini|rollsroyce).
+// Car manufacturer (rhmiapp-96): the Settings page writes vehicle in the data dir (auto|bmw|toyota|mini|rollsroyce).
 // "auto" means: say nothing and let car_config.hpp read the car's carplay.ini, which is what it already does when
 // NBT_VEHICLE is unset. An explicit NBT_VEHICLE in nbt-aad.env still wins over the file.
-static const char* const kVehicleChoiceFile = "/var/opt/aa/vehicle";
+static const char* const kVehicleChoiceName = "vehicle";   // nbt_paths.hpp dataFile()
 static const char* const kStatusFile = "/dev/shmem/nbt-aad-status";
 static void applyVehicleChoice() {
     if (getenv("NBT_VEHICLE")) { printf("[Car] NBT_VEHICLE from the environment: %s\n", getenv("NBT_VEHICLE")); return; }
-    FILE* f = fopen(kVehicleChoiceFile, "r");
+    const nbt::FilePath choice = nbt::dataFile(kVehicleChoiceName);
+    FILE* f = fopen(choice.c_str(), "r");
     if (!f) return;
     char v[24] = {0};
     if (fscanf(f, "%23s", v) != 1) v[0] = 0;
     fclose(f);
     if (!v[0] || !strcmp(v, "auto")) { printf("[Car] vehicle: auto (carplay.ini decides)\n"); return; }
     if (strcmp(v,"bmw") && strcmp(v,"toyota") && strcmp(v,"mini") && strcmp(v,"rollsroyce")) {
-        printf("[Car] %s says '%s', which is not a vehicle; ignoring\n", kVehicleChoiceFile, v);
+        printf("[Car] %s says '%s', which is not a vehicle; ignoring\n", choice.c_str(), v);
         return;
     }
     setenv("NBT_VEHICLE", v, 1);
-    printf("[Car] vehicle from %s: %s\n", kVehicleChoiceFile, v);
+    printf("[Car] vehicle from %s: %s\n", choice.c_str(), v);
 }
 
 // A short machine token for the iDrive Settings page: the plugin turns it into a sentence. Written with the same

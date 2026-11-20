@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 // Required Notice: Copyright (c) 2026 nanaisu - NBT-AAD (https://github.com/Sq00ky/Supra-iDrive6-Android-Auto)
 // Host test for src/nbt_paths.hpp: hand install vs NBTApps package, decided from the daemon's argv[0] or (iDrive app)
-// from an executable nbt-aad in the package's app dir; the app, data and conf dirs of each.
+// from an executable nbt-aad in the package's app dir, and the managed install (NBT_DATA_DIR) over both; the app,
+// data and conf dirs of each.
 #include "nbt_paths.hpp"
 #include <stdio.h>
 #include <stdlib.h>
@@ -104,6 +105,64 @@ int main() {
 
     // flagSet: neither file there (the dirs are the real ones, so only a name nobody makes).
     CHECK(!nbt::flagSet("nbt-paths-test-no-such-flag"));
+
+    // ---- managed install: NBT_DATA_DIR from an app manager wins over both -------------------------------------
+    CHECK(nbt::managedDirValid("/var/opt/nbt-manager/data/android-auto"));
+    CHECK(nbt::managedDirValid("/a"));
+    CHECK(!nbt::managedDirValid(NULL));
+    CHECK(!nbt::managedDirValid(""));
+    CHECK(!nbt::managedDirValid("data/aa"));                        // relative
+    CHECK(!nbt::managedDirValid("/"));                              // a trailing '/'
+    CHECK(!nbt::managedDirValid("/var/opt/aa/"));
+    CHECK(!nbt::managedDirValid("/var//aa"));
+    CHECK(!nbt::managedDirValid("/var/./aa"));
+    CHECK(!nbt::managedDirValid("/var/../aa"));
+    CHECK(!nbt::managedDirValid("/var/aa/.."));
+    CHECK(nbt::managedDirValid("/var/.aa/..b"));                    // dots inside a name are fine
+    char longDir[128];
+    memset(longDir, 'a', sizeof(longDir));
+    longDir[0] = '/';
+    longDir[96] = 0;                                                // 96 characters: one too many
+    CHECK(!nbt::managedDirValid(longDir));
+    longDir[95] = 0;
+    CHECK(nbt::managedDirValid(longDir));
+
+    char managedRoot[] = "/tmp/nbt_paths_managedXXXXXX";
+    CHECK(mkdtemp(managedRoot) != NULL);
+    unsetenv("NBT_DATA_DIR");
+    nbt::forgetManagedDir();
+    CHECK(!nbt::managed());                                         // unset: the decisions above stand
+    setenv("NBT_DATA_DIR", "/tmp/nbt_paths_no_such_dir", 1);
+    nbt::forgetManagedDir();
+    CHECK(!nbt::managed());                                         // not a directory
+    setenv("NBT_DATA_DIR", managedRoot, 1);
+    nbt::forgetManagedDir();
+    nbt::initPaths(PKG_APP "/nbt-aad");                             // even a package's argv[0]
+    CHECK(nbt::managed());
+    SAME(nbt::appDir(), managedRoot);
+    SAME(nbt::dataDir(), managedRoot);
+    SAME(nbt::confDir(), managedRoot);
+    SAME(nbt::installName(), "managed install");
+    char expect[160];
+    snprintf(expect, sizeof(expect), "%s/nbt-aad", managedRoot);
+    SAME(nbt::daemonPath(), expect);
+    snprintf(expect, sizeof(expect), "%s/nbt-aad.env", managedRoot);
+    SAME(nbt::confFile(nbt::kDaemonEnvName).c_str(), expect);
+    snprintf(expect, sizeof(expect), "%s/vehicle", managedRoot);
+    SAME(nbt::dataFile("vehicle").c_str(), expect);
+    CHECK(!nbt::flagSet("usb-aa"));
+    snprintf(expect, sizeof(expect), "%s/usb-aa", managedRoot);
+    f = fopen(expect, "w");
+    CHECK(f != NULL);
+    if (f) fclose(f);
+    CHECK(nbt::flagSet("usb-aa"));                                  // the checkbox file in the managed folder
+    unlink(expect);
+    nbt::makeDataDir();                                             // makes nothing: the folder is the manager's
+    unsetenv("NBT_DATA_DIR");
+    nbt::forgetManagedDir();
+    CHECK(!nbt::managed());
+    CHECK(nbt::packaged());                                         // the argv[0] decision was kept
+    rmdir(managedRoot);
 
     printf(fails ? "test_nbt_paths: %d FAILED\n" : "test_nbt_paths: all passed\n", fails);
     return fails ? 1 : 0;

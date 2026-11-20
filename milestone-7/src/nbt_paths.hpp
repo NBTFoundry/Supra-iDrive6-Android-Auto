@@ -24,8 +24,14 @@
 //
 // The package's folders are written out whole below, so each program carries them as one string: the packaging job
 // recognises a build that knows them by finding both in nbt-aad and in libNbtAad.so.
+//
+// A third install wins over both: an app manager (NBT Manager) starts nbt-aad itself and gives it NBT_DATA_DIR, a
+// folder of its own. That folder is then the app, data and conf dir: nothing under /opt/aa, /var/opt/aa or the
+// package's folders is read or written, so files left by an earlier install change nothing. It comes from the
+// environment, so every program the daemon starts agrees without being told; the iDrive app never has it.
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -77,14 +83,55 @@ inline void initPaths(const char* argv0) { setPackaged(pathIsPackaged(argv0)); }
 // iDrive app: from the daemon it would start.
 inline void initPathsForApp() { setPackaged(daemonExecutableIn(NBT_PKG_APP_DIR)); }
 
-inline const char* appDir() { return packaged() ? NBT_PKG_APP_DIR : NBT_HAND_APP_DIR; }
-inline const char* dataDir() { return packaged() ? NBT_PKG_DATA_DIR : NBT_HAND_DATA_DIR; }
-inline const char* confDir() { return packaged() ? NBT_PKG_DATA_DIR : NBT_HAND_APP_DIR; }
-// The daemon's whole path (a literal, so it can stand in a spawn argv for as long as needed).
+// Pure (host-tested): whether an NBT_DATA_DIR value can be the managed install's folder. Absolute, without "." or
+// ".." components or a trailing '/', and short enough for a FilePath with a name of up to 63 characters.
+inline bool managedDirValid(const char* dir) {
+    if (!dir || dir[0] != '/' || strlen(dir) > 95 || dir[strlen(dir) - 1] == '/') return false;
+    for (const char* p = dir; *p; ++p) {
+        if (p[0] != '/') continue;
+        if (p[1] == '/') return false;
+        if (p[1] == '.' && (p[2] == '/' || p[2] == 0)) return false;
+        if (p[1] == '.' && p[2] == '.' && (p[3] == '/' || p[3] == 0)) return false;
+    }
+    return true;
+}
+
+// The managed install's folder (NBT_DATA_DIR, an existing directory), or NULL. Looked at once per program; host
+// tests forget it to look again.
+struct ManagedDirCache { int state; char dir[96]; };   // state -1 not looked yet, 0 none, 1 dir
+inline ManagedDirCache& managedDirCache() {
+    static ManagedDirCache c = { -1, { 0 } };
+    return c;
+}
+inline void forgetManagedDir() { managedDirCache().state = -1; }
+inline const char* managedDir() {
+    ManagedDirCache& c = managedDirCache();
+    if (c.state < 0) {
+        const char* e = getenv("NBT_DATA_DIR");
+        struct stat st;
+        c.state = managedDirValid(e) && stat(e, &st) == 0 && S_ISDIR(st.st_mode) ? 1 : 0;
+        if (c.state) snprintf(c.dir, sizeof(c.dir), "%s", e);
+    }
+    return c.state == 1 ? c.dir : NULL;
+}
+inline bool managed() { return managedDir() != NULL; }
+
+inline const char* appDir() { return managed() ? managedDir() : packaged() ? NBT_PKG_APP_DIR : NBT_HAND_APP_DIR; }
+inline const char* dataDir() { return managed() ? managedDir() : packaged() ? NBT_PKG_DATA_DIR : NBT_HAND_DATA_DIR; }
+inline const char* confDir() { return managed() ? managedDir() : packaged() ? NBT_PKG_DATA_DIR : NBT_HAND_APP_DIR; }
+// The daemon's whole path (a literal, so it can stand in a spawn argv for as long as needed; a managed install's
+// lives in a static buffer for the program's life).
 inline const char* daemonPath() {
+    if (managed()) {
+        static char s_path[112];
+        snprintf(s_path, sizeof(s_path), "%s/%s", managedDir(), NBT_DAEMON_NAME);
+        return s_path;
+    }
     return packaged() ? NBT_PKG_APP_DIR "/" NBT_DAEMON_NAME : NBT_HAND_APP_DIR "/" NBT_DAEMON_NAME;
 }
-inline const char* installName() { return packaged() ? "package install" : "hand install"; }
+inline const char* installName() {
+    return managed() ? "managed install" : packaged() ? "package install" : "hand install";
+}
 
 // <dir>/<name> in a buffer of its own, for one call: fopen(nbt::dataFile("spp-model").c_str(), "r"). Use c_str()
 // for printf as well: the object itself must not go through "...".
@@ -124,6 +171,7 @@ inline bool flagText(const char* name, char* out, size_t n) {
 // Make the data dir before writing into it (EEXIST is fine). For a package its parents too, in case the agent has not
 // made them yet; a hand install only ever made /var/opt/aa itself.
 inline void makeDataDir() {
+    if (managed()) return;                   // the manager's folder: it exists and is not ours to make
     if (packaged()) {
         mkdir("/var/opt/nbtapp", 0755);
         mkdir("/var/opt/nbtapp/data", 0755);
