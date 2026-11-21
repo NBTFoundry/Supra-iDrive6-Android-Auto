@@ -16,7 +16,7 @@ static const char* const kVars[] = {
     "NBT_BROWSER_CONN", "NBT_BROWSER_RATE", "NBT_BROWSER_FORCE_RATE", "NBT_BROWSER_IDLE_S",
     "NBT_BROWSER_PROMPT_IDLE_MS", "NBT_BROWSER_WAIT_MS", "NBT_BROWSER_PREROLL_MS", "NBT_BROWSER_DRIFT",
     "NBT_BROWSER_DRIFT_LOOP", "NBT_BROWSER_PRIO", "NBT_BROWSER_RESAMPLER", "NBT_BROWSER_SPEEX_Q",
-    "NBT_BROWSER_RESAMPLER_FILE", "NBT_BROWSER_REFOCUS", "NBT_BROWSER_ASOUND", "NBT_BROWSER_PCM", "NBT_BROWSER_FRAG",
+    "NBT_BROWSER_RESAMPLER_FILE", "NBT_BROWSER_REFOCUS", "NBT_BROWSER_ASOUND", "NBT_BROWSER_PCM", "NBT_BROWSER_A2I", "NBT_BROWSER_FRAG",
     "NBT_BROWSER_FRAGS", "NBT_DUCK_DB", "NBT_DUCK_ATTACK_MS", "NBT_DUCK_RELEASE_MS", "NBT_DUCK_HOLD_MS",
     "NBT_MEDIA_GAIN_DB", "NBT_GUIDANCE_GAIN_DB", "NBT_SYSTEM_GAIN_DB", "NBT_AA_DEFER_ACKS", "NBT_AA_UNDERFLOW_REPORT",
     "NBT_BT_SRC", "NBT_BT_SINK", "NBT_BT_CONN", "NBT_BT_ROUTE_DELAY_MS", "NBT_BT_REFOCUS", "NBT_BT_RELEASE",
@@ -52,6 +52,7 @@ int main() {
         CHECK(c.refocus && d.refocus);
         CHECK(same(c.shim_path, "/opt/mm/lib/libasound/libasound.so") && same(d.shim_path, c.shim_path));
         CHECK(c.pcm == NULL && d.pcm == NULL);
+        CHECK(c.a2i == NULL && d.a2i == NULL);
         CHECK(c.frag == 4096 && d.frag == 4096);
         CHECK(c.frags == 5 && d.frags == 5);
         CHECK(c.duck_db == -12 && d.duck_db == -12);
@@ -83,6 +84,7 @@ int main() {
         setenv("NBT_BROWSER_REFOCUS", "off", 1);
         setenv("NBT_BROWSER_ASOUND", "/tmp/shim.so", 1);
         setenv("NBT_BROWSER_PCM", "0:3", 1);
+        setenv("NBT_BROWSER_A2I", "input_stereo_0", 1);
         setenv("NBT_BROWSER_FRAG", "2048", 1);
         setenv("NBT_BROWSER_FRAGS", "8", 1);
         setenv("NBT_DUCK_DB", "-20", 1);
@@ -111,6 +113,7 @@ int main() {
         CHECK(!c.refocus);
         CHECK(same(c.shim_path, "/tmp/shim.so"));
         CHECK(same(c.pcm, "0:3"));
+        CHECK(same(c.a2i, "input_stereo_0"));
         CHECK(c.frag == 2048 && c.frags == 8);
         CHECK(c.duck_db == -20 && c.duck_attack_ms == 10 && c.duck_release_ms == 20 && c.duck_hold_ms == 30);
         CHECK(c.media_gain_db == -3 && c.guidance_gain_db == 4 && c.system_gain_db == -5);

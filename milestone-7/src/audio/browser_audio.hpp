@@ -28,6 +28,9 @@
 //   NBT_BROWSER_CONN     connection id (default 0xb8; 0 = do not route, just play)
 //   NBT_BROWSER_ASOUND   shim path (default /opt/mm/lib/libasound/libasound.so)
 //   NBT_BROWSER_PCM      "card:device" instead of snd_pcm_open_preferred
+//   NBT_BROWSER_A2I      an io-amp input (e.g. input_stereo_0, the media player's) to write the mix into through
+//                        liba2i_client instead of the shim, at 44100 Hz; for a connection (NBT_BROWSER_CONN) whose
+//                        source plays that input, such as 0x1d0, the media player's online stream source
 //   NBT_BROWSER_RATE     device rate to ask for (default 48000; lowered to the device's reported maximum, 44100 here)
 //   NBT_BROWSER_FORCE_RATE  experiment: ask for this rate even outside the device's reported range (e.g. 48000, to
 //                        play the 48 kHz AA streams without resampling). Off by default. If the car refuses it the

@@ -20,7 +20,7 @@ int envInt(const char* name, int def) {
 BrowserConfig::BrowserConfig()
     : conn(0xb8), want_rate(48000), force_rate(0), idle_s(10), prompt_idle_ms(1000), wait_ms(30), preroll_ms(60),
       drift(true), drift_pi(true), prio(15), resampler_linear(false), speex_q(5), resampler_file("/tmp/nbt_resampler"),
-      refocus(true), shim_path("/opt/mm/lib/libasound/libasound.so"), pcm(NULL), frag(4096), frags(5), duck_db(-12),
+      refocus(true), shim_path("/opt/mm/lib/libasound/libasound.so"), pcm(NULL), a2i(NULL), frag(4096), frags(5), duck_db(-12),
       duck_attack_ms(80), duck_release_ms(500), duck_hold_ms(600), media_gain_db(0), guidance_gain_db(0),
       system_gain_db(0), defer_acks(true), underflow_reports(true) {
     speech.enabled = true;
@@ -69,6 +69,8 @@ BrowserConfig readBrowserConfig() {
     c.shim_path = getenv("NBT_BROWSER_ASOUND");
     if (!c.shim_path || !*c.shim_path) c.shim_path = "/opt/mm/lib/libasound/libasound.so";
     c.pcm = getenv("NBT_BROWSER_PCM");
+    c.a2i = getenv("NBT_BROWSER_A2I");
+    if (c.a2i && !*c.a2i) c.a2i = NULL;
     c.frag = envInt("NBT_BROWSER_FRAG", 4096);
     c.frags = envInt("NBT_BROWSER_FRAGS", 5);
     c.duck_db = envInt("NBT_DUCK_DB", -12);

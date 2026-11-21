@@ -116,6 +116,7 @@ struct BrowserConfig {
     bool refocus;               // NBT_BROWSER_REFOCUS: build the connection again when the mic closes (on)
     const char* shim_path;      // NBT_BROWSER_ASOUND (/opt/mm/lib/libasound/libasound.so)
     const char* pcm;            // NBT_BROWSER_PCM: "card:device" instead of snd_pcm_open_preferred (NULL = unset)
+    const char* a2i;            // NBT_BROWSER_A2I: io-amp input written through A2I instead of the shim (NULL = shim)
     int frag;                   // NBT_BROWSER_FRAG: fragment bytes (4096; the device rounds and clamps it)
     int frags;                  // NBT_BROWSER_FRAGS: fragments (5; clamped to 1..256)
     int duck_db;                // NBT_DUCK_DB: media level while ducked (-12)
