@@ -33,6 +33,7 @@ SRCS = src/main.cpp \
        src/audio/pcm_ring.cpp \
        src/audio/resampler.cpp \
        src/audio/asound_device.cpp \
+       src/audio/asound_device_a2i.cpp \
        src/video_manager.cpp \
        src/mmr_launch.cpp \
        src/tcp_server.cpp \

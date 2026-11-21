@@ -39,7 +39,7 @@ const uint32_t AsoundDevice::kChannels;
 
 AsoundDevice::AsoundDevice()
     : shim_path_(NULL), want_rate_(48000), force_rate_(0), pcm_sel_(NULL), frag_cfg_(4096), frags_cfg_(5), lib_(NULL),
-      pcm_(NULL), rate_(0), frag_bytes_(0),
+      pcm_(NULL), a2i_ep_(NULL), a2i_(NULL), a2i_buf_(NULL), a2i_size_(0), a2i_fill_(0), rate_(0), frag_bytes_(0),
       write_errors_(0), prepares_(0), writes_(0), writes_blocked_(0), lead_min_(0), lead_max_(0), lead_seen_(false) {
     memset(fn_, 0, sizeof(fn_));
 }
@@ -57,7 +57,7 @@ void AsoundDevice::configure(const char* shim_path, uint32_t want_rate, uint32_t
 }
 
 bool AsoundDevice::load() {
-    if (lib_) return true;
+    if (a2i_ep_ || lib_) return true;
     lib_ = dlopen(shim_path_, RTLD_NOW | RTLD_LOCAL);
     if (!lib_) {
         printf("[Browser] could not load %s: %s\n", shim_path_, dlerror());
@@ -85,6 +85,7 @@ void AsoundDevice::unload() {
 // the device period. Car log 2026-11-01: "check_parameter: Invalid uSizeOfPackage: 3528" (20 ms at 44.1 kHz), which
 // snd_pcm_plugin_params reports as -22. A refused open can leave the handle half set up, so every try reopens it.
 bool AsoundDevice::open() {
+    if (a2i_ep_) return openA2i();
     if (pcm_) return true;
     if (!lib_ && !load()) return false;
     int frag = frag_cfg_;     // NBT_BROWSER_FRAG
@@ -189,6 +190,7 @@ bool AsoundDevice::openWith(int frag, int frags) {
 }
 
 void AsoundDevice::close() {
+    if (a2i_ep_) { closeA2i(); return; }
     if (!pcm_) return;
     snd_pcm_t* h = (snd_pcm_t*)pcm_;
     if (fn_[F_FLUSH]) ((FnFlush)fn_[F_FLUSH])(h, SND_PCM_CHANNEL_PLAYBACK);
@@ -198,6 +200,7 @@ void AsoundDevice::close() {
 }
 
 bool AsoundDevice::write(const int16_t* buf, size_t frames) {
+    if (a2i_ep_) return writeA2i(buf, frames);
     snd_pcm_t* h = (snd_pcm_t*)pcm_;
     const uint8_t* p = reinterpret_cast<const uint8_t*>(buf);
     size_t left = frames * kChannels * 2;

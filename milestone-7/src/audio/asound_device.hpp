@@ -35,13 +35,17 @@ public:
     // rounds and clamps them).
     void configure(const char* shim_path, uint32_t want_rate, uint32_t force_rate, const char* pcm, int frag,
                    int frags);
+    // NBT_BROWSER_A2I: write this io-amp input through liba2i_client (asound_device_a2i.cpp) instead of the shim, at
+    // 44100 Hz in buffers of the configured fragment size; load() then has nothing to load.
+    void configureA2i(const char* endpoint) { a2i_ep_ = endpoint; }
+    bool usesA2i() const { return a2i_ep_ != NULL; }
     bool load();     // dlopen the shim and look up its entry points (already loaded: true)
     void unload();   // dlclose (shutdown)
 
     // Opens the device: the configured fragment size first, then a deeper and a larger buffer. Already open: true.
     bool open();
     void close();
-    bool isOpen() const { return pcm_ != NULL; }
+    bool isOpen() const { return pcm_ != NULL || a2i_ != NULL; }
     uint32_t rate() const { return rate_; }             // the rate actually set up
     uint32_t fragBytes() const { return frag_bytes_; }  // one device fragment = one mixer block
 
@@ -70,6 +74,11 @@ private:
     AsoundDevice& operator=(const AsoundDevice&);
 
     bool openWith(int frag, int frags);
+    bool openA2i();
+    void closeA2i();
+    bool writeA2i(const int16_t* buf, size_t frames);
+    bool nextA2iBuffer(bool wait);
+    bool flushA2iBuffer();
 
     const char* shim_path_;
     uint32_t want_rate_;
@@ -81,6 +90,10 @@ private:
     void* lib_;
     void* fn_[11];
     void* pcm_;
+    const char* a2i_ep_;     // NBT_BROWSER_A2I (NULL = the shim)
+    void* a2i_;              // A2I client handle
+    uint8_t* a2i_buf_;       // the buffer being filled, from A2I_Client_GetBuffer
+    uint32_t a2i_size_, a2i_fill_;
     uint32_t rate_;          // device rate actually set up
     uint32_t frag_bytes_;
 

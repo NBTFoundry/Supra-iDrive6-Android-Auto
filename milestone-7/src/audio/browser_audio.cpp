@@ -189,6 +189,10 @@ bool BrowserAudio::init(const BrowserConfig& cfg) {
                drift_pi_on_ ? "proportional-integral" : "proportional");
     refocus_ = cfg.refocus;
     dev_.configure(cfg.shim_path, cfg.want_rate, cfg.force_rate, cfg.pcm, cfg.frag, cfg.frags);
+    if (cfg.a2i) {
+        dev_.configureA2i(cfg.a2i);
+        printf("[Browser] output: io-amp input %s through A2I (NBT_BROWSER_A2I), not the libasound shim\n", cfg.a2i);
+    }
 
     duck_cfg_ = DuckConfig();
     duck_cfg_.duck_gain = AudioMixer::dbToGain(cfg.duck_db);
